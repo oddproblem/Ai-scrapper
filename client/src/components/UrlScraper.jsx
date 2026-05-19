@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { api } from '../api.js';
 
 export default function UrlScraper({ onScrapeDone, showToast }) {
   const [url, setUrl] = useState('');
@@ -17,10 +18,9 @@ export default function UrlScraper({ onScrapeDone, showToast }) {
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch('/api/opportunities/scrape-url', {
+      const res = await api('/api/opportunities/scrape-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ url: url.trim() }),
       });
       const data = await res.json();

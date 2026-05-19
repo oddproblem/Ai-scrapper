@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { api } from './api.js';
 import Sidebar from './components/Sidebar.jsx';
 import Header from './components/Header.jsx';
 import StatsCards from './components/StatsCards.jsx';
@@ -32,7 +33,7 @@ export default function App() {
   }, [savedIds]);
 
   useEffect(() => {
-    fetch('/auth/me', { credentials: 'include' })
+    api('/auth/me')
       .then((r) => r.json())
       .then((data) => { if (data.user) setUser(data.user); })
       .catch(() => {})
@@ -53,7 +54,7 @@ export default function App() {
         params.set('limit', '9');
       }
 
-      const res = await fetch(`/api/opportunities?${params}`, { credentials: 'include' });
+      const res = await api(`/api/opportunities?${params}`);
       const data = await res.json();
       setOpportunities(data.opportunities || []);
       setPagination(data.pagination || { page: 1, pages: 1, total: 0 });
@@ -65,7 +66,7 @@ export default function App() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch('/api/opportunities/stats', { credentials: 'include' });
+      const res = await api('/api/opportunities/stats');
       setStats(await res.json());
     } catch {}
   }, []);
@@ -82,7 +83,7 @@ export default function App() {
         return;
       }
       setLoading(true);
-      fetch(`/api/opportunities?limit=100`, { credentials: 'include' })
+      api(`/api/opportunities?limit=100`)
         .then(r => r.json())
         .then(data => {
           const saved = (data.opportunities || []).filter(o => savedIds.includes(o._id));
@@ -101,7 +102,7 @@ export default function App() {
     setScraping(true);
     showToast('Scrape pipeline started...');
     try {
-      await fetch('/api/opportunities/scrape', { method: 'POST', credentials: 'include' });
+      await api('/api/opportunities/scrape', { method: 'POST' });
       setTimeout(() => {
         fetchOpportunities(1);
         fetchStats();
@@ -122,7 +123,7 @@ export default function App() {
       if (filters.search) params.set('search', filters.search);
       if (filters.deadline) params.set('deadline', filters.deadline);
 
-      const res = await fetch(`/api/opportunities/export/csv?${params}`, { credentials: 'include' });
+      const res = await api(`/api/opportunities/export/csv?${params}`);
       if (!res.ok) throw new Error('Export failed');
 
       const blob = await res.blob();
@@ -161,7 +162,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    try { await fetch('/auth/logout', { method: 'POST', credentials: 'include' }); } catch {}
+    try { await api('/auth/logout', { method: 'POST' }); } catch {}
     setUser(null);
   };
 

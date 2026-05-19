@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "NODE_ENV=production node server.js",
+    "start": "node server.js",
+    "build": "cd client && npm install && npm run build",
     "scrape:now": "node --input-type=module -e \"import { runNow } from './scheduler/cron.js'; runNow().then(() => process.exit(0));\"",
     "client:dev": "cd client && npm run dev",
     "client:build": "cd client && npm run build",

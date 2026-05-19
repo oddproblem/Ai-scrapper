@@ -8,7 +8,6 @@ const API_BASE = 'https://unstop.com/api/public/opportunity/search-new';
 const CATEGORIES = [
   { opportunity: 'hackathons', type: 'hackathon' },
   { opportunity: 'competitions', type: 'challenge' },
-  { opportunity: 'internships', type: 'program' },
 ];
 
 /**

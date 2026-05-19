@@ -15,20 +15,30 @@ router.get(
 
 /**
  * GET /auth/google/callback — Google OAuth callback
+ * After success, redirect to frontend with user token in URL
  */
 router.get(
   '/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login' }),
+  passport.authenticate('google', { failureRedirect: '/auth/fail', session: false }),
   (req, res) => {
-    res.redirect(process.env.CLIENT_URL || '/');
+    const clientUrl = process.env.CLIENT_URL || '/';
+    // Pass the user's MongoDB _id as token — frontend stores it
+    res.redirect(`${clientUrl}?token=${req.user._id}`);
   }
 );
 
 /**
- * GET /auth/me — Get current user
+ * GET /auth/fail — OAuth failure
  */
-router.get('/me', (req, res) => {
-  // If OAuth isn't configured, return a dev user
+router.get('/fail', (req, res) => {
+  res.status(401).json({ error: 'Google authentication failed' });
+});
+
+/**
+ * GET /auth/me — Get current user by token
+ */
+router.get('/me', async (req, res) => {
+  // Dev mode — no OAuth configured
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
     return res.json({
       user: {
@@ -43,10 +53,19 @@ router.get('/me', (req, res) => {
     });
   }
 
-  if (req.isAuthenticated()) {
-    return res.json({ user: req.user, devMode: false });
+  // Check for token in Authorization header
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) {
+    return res.status(401).json({ user: null });
   }
-  res.status(401).json({ user: null });
+
+  try {
+    const user = await User.findById(token).lean();
+    if (!user) return res.status(401).json({ user: null });
+    return res.json({ user, devMode: false });
+  } catch {
+    return res.status(401).json({ user: null });
+  }
 });
 
 /**
@@ -54,12 +73,12 @@ router.get('/me', (req, res) => {
  */
 router.get('/alerts', ensureAuth, async (req, res) => {
   try {
-    // Dev mode
-    if (!process.env.GOOGLE_CLIENT_ID) {
+    const userId = req.userId;
+    if (userId === 'dev-user') {
       const saved = await User.findOne({}).select('alerts').lean();
       return res.json(saved?.alerts || { enabled: false, keywords: '', types: [], sources: [], frequency: 'daily' });
     }
-    const user = await User.findById(req.user._id).select('alerts').lean();
+    const user = await User.findById(userId).select('alerts').lean();
     res.json(user?.alerts || { enabled: false, keywords: '', types: [], sources: [], frequency: 'daily' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to get alert preferences' });
@@ -80,8 +99,10 @@ router.put('/alerts', ensureAuth, async (req, res) => {
       frequency: ['realtime', 'daily', 'weekly'].includes(frequency) ? frequency : 'daily',
     };
 
-    // Dev mode — update or create first user
-    if (!process.env.GOOGLE_CLIENT_ID) {
+    const userId = req.userId;
+
+    // Dev mode
+    if (userId === 'dev-user') {
       let user = await User.findOne({});
       if (!user) {
         user = await User.create({
@@ -98,11 +119,7 @@ router.put('/alerts', ensureAuth, async (req, res) => {
       return res.json({ message: 'Alert preferences saved', alerts: user.alerts });
     }
 
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { alerts },
-      { new: true }
-    );
+    const user = await User.findByIdAndUpdate(userId, { alerts }, { new: true });
     res.json({ message: 'Alert preferences saved', alerts: user.alerts });
   } catch (err) {
     res.status(500).json({ error: 'Failed to save alert preferences' });
@@ -110,14 +127,10 @@ router.put('/alerts', ensureAuth, async (req, res) => {
 });
 
 /**
- * POST /auth/logout
+ * POST /auth/logout — just a no-op since we use token auth
  */
 router.post('/logout', (req, res) => {
-  req.logout((err) => {
-    if (err) return res.status(500).json({ error: 'Logout failed' });
-    req.session?.destroy?.();
-    res.json({ message: 'Logged out' });
-  });
+  res.json({ message: 'Logged out' });
 });
 
 export default router;

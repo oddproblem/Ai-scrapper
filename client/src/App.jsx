@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { api } from './api.js';
+import { api, setToken, getToken, clearToken } from './api.js';
 import Sidebar from './components/Sidebar.jsx';
 import Header from './components/Header.jsx';
 import StatsCards from './components/StatsCards.jsx';
@@ -33,11 +33,24 @@ export default function App() {
   }, [savedIds]);
 
   useEffect(() => {
-    api('/auth/me')
-      .then((r) => r.json())
-      .then((data) => { if (data.user) setUser(data.user); })
-      .catch(() => {})
-      .finally(() => setAuthChecked(true));
+    // Check for OAuth token in URL (redirect after Google login)
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get('token');
+    if (urlToken) {
+      setToken(urlToken);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
+    // Check auth status
+    if (getToken() || !import.meta.env.VITE_API_URL) {
+      api('/auth/me')
+        .then((r) => r.json())
+        .then((data) => { if (data.user) setUser(data.user); })
+        .catch(() => { clearToken(); })
+        .finally(() => setAuthChecked(true));
+    } else {
+      setAuthChecked(true);
+    }
   }, []);
 
   const fetchOpportunities = useCallback(async (p = 1) => {
@@ -162,7 +175,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    try { await api('/auth/logout', { method: 'POST' }); } catch {}
+    clearToken();
     setUser(null);
   };
 

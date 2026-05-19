@@ -207,7 +207,7 @@ export default function App() {
       />
       <main className="main-content">
         {activePage === 'alerts' ? (
-          <AlertsPage showToast={showToast} />
+          <AlertsPage showToast={showToast} userEmail={user?.email} />
         ) : (
           <>
             <Header

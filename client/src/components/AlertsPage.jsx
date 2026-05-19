@@ -1,20 +1,36 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { api } from '../api.js';
 
-export default function AlertsPage({ showToast }) {
-  const [settings, setSettings] = useState(() => {
-    try {
-      const saved = localStorage.getItem('alertSettings');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return {
-      enabled: false,
-      email: '',
-      keywords: '',
-      types: [],
-      sources: [],
-      frequency: 'daily',
-    };
+export default function AlertsPage({ showToast, userEmail }) {
+  const [settings, setSettings] = useState({
+    enabled: false,
+    email: userEmail || '',
+    keywords: '',
+    types: [],
+    sources: [],
+    frequency: 'daily',
   });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Load preferences from backend
+  useEffect(() => {
+    api('/auth/alerts')
+      .then(r => r.json())
+      .then(data => {
+        setSettings(prev => ({
+          ...prev,
+          enabled: data.enabled || false,
+          keywords: data.keywords || '',
+          types: data.types || [],
+          sources: data.sources || [],
+          frequency: data.frequency || 'daily',
+          email: userEmail || prev.email,
+        }));
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [userEmail]);
 
   const typeOptions = ['hackathon', 'challenge', 'program', 'accelerator', 'grant', 'incubator'];
   const sourceOptions = ['devfolio', 'unstop', 'startupIndia'];
@@ -37,10 +53,33 @@ export default function AlertsPage({ showToast }) {
     }));
   };
 
-  const handleSave = () => {
-    localStorage.setItem('alertSettings', JSON.stringify(settings));
-    showToast('Alert preferences saved');
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await api('/auth/alerts', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast('Alert preferences saved');
+      } else {
+        showToast(data.error || 'Failed to save');
+      }
+    } catch {
+      showToast('Failed to save preferences');
+    }
+    setSaving(false);
   };
+
+  if (loading) {
+    return (
+      <div className="alerts-page">
+        <div className="loading-state"><div className="loading-dots"><span /><span /><span /></div></div>
+      </div>
+    );
+  }
 
   return (
     <div className="alerts-page">
@@ -73,6 +112,7 @@ export default function AlertsPage({ showToast }) {
               value={settings.email}
               onChange={(e) => handleChange('email', e.target.value)}
             />
+            <span className="alert-field-hint">Alerts will be sent to this email when new opportunities match</span>
           </div>
 
           <div className="alert-field">
@@ -136,8 +176,8 @@ export default function AlertsPage({ showToast }) {
         </div>
       </div>
 
-      <button className="alerts-save-btn" onClick={handleSave}>
-        Save Preferences
+      <button className="alerts-save-btn" onClick={handleSave} disabled={saving}>
+        {saving ? 'Saving...' : 'Save Preferences'}
       </button>
     </div>
   );

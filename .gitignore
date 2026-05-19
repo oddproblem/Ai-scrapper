@@ -27,3 +27,7 @@ Thumbs.db
 
 # Coverage
 coverage/
+
+# Screenshot Assets (Local Only)
+snaps/
+snaps.md
